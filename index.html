@@ -38,6 +38,7 @@
   .opt:active { transform: scale(.98); border-color: var(--green); }
   .opt .emoji { font-size: 24px; }
   .opt small { display: block; color: var(--sub); font-size: 13px; }
+  .opt.compact { padding: 12px 16px; font-size: 15px; }
   .card {
     background: var(--card); border-radius: 16px; padding: 18px;
     box-shadow: 0 2px 10px rgba(31,77,56,.08); margin-bottom: 14px;
@@ -53,6 +54,11 @@
   .hero .place { font-size: 13px; opacity: .85; letter-spacing: .1em; }
   .hero .title { font-size: 21px; font-weight: 800; margin: 2px 0 6px; }
   .hero .msg { font-size: 14px; opacity: .95; }
+  .done-banner {
+    background: #eaf6ef; border: 2px solid var(--green); color: var(--green-d);
+    border-radius: 14px; padding: 12px 16px; font-weight: 700; font-size: 15px;
+    margin-bottom: 14px; text-align: center;
+  }
   .note { border-left: 4px solid var(--amber); background: #fdf6ec; border-radius: 0 10px 10px 0; padding: 10px 14px; font-size: 14px; margin-bottom: 12px; }
   .note.blue { border-color: var(--blue); background: #eff6fc; }
   .note.red { border-color: var(--red); background: #fdf1ee; }
@@ -63,13 +69,16 @@
     font-weight: 700; cursor: pointer; margin-top: 10px;
   }
   .btn.ghost { background: #fff; color: var(--green); border: 2px solid var(--green); }
+  .btn.sub { background: #fff; color: var(--sub); border: 2px solid #d8e3dc; font-size: 15px; padding: 12px; }
   .btn:active { opacity: .85; }
-  .yesterday { font-size: 13px; color: var(--sub); background: #fff; border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
+  .hist { background: #fff; border-radius: 12px; padding: 4px 14px; margin-bottom: 14px; }
+  .hist-item { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; font-size: 14px; }
+  .hist-item:last-child { border-bottom: none; }
+  .hist-item .d { color: var(--sub); font-size: 12px; min-width: 4.5em; }
+  .hist-title { font-size: 13px; color: var(--sub); margin: 0 0 2px; font-weight: 700; }
   .progress { display: flex; gap: 6px; margin-bottom: 6px; }
   .progress span { height: 5px; flex: 1; border-radius: 3px; background: #d8e3dc; }
   .progress span.on { background: var(--green); }
-  .cheer { text-align: center; font-size: 15px; color: var(--green-d); font-weight: 600; margin: 14px 0 4px; }
-  .done-icon { text-align: center; font-size: 56px; margin: 30px 0 10px; }
 </style>
 </head>
 <body>
@@ -79,12 +88,13 @@
   <div class="screen active" id="s0">
     <h1 id="greeting">おはようございます 🌅</h1>
     <div class="date" id="dateLabel"></div>
-    <div class="yesterday" id="yesterdayBox" style="display:none"></div>
+    <div id="histBox0"></div>
     <div class="card">
       <h2>今日のあなたに合わせてメニューを組みます</h2>
       <div style="font-size:14px;color:var(--sub)">3つ答えるだけ。30秒で終わります。</div>
     </div>
     <button class="btn" onclick="go(1)">はじめる</button>
+    <button class="btn sub" onclick="go(6)">一覧から自分で選ぶ</button>
   </div>
 
   <!-- Q1 wake -->
@@ -119,8 +129,9 @@
     </div>
   </div>
 
-  <!-- RESULT -->
+  <!-- TODAY / RESULT -->
   <div class="screen" id="s4">
+    <div id="doneBanner" style="display:none" class="done-banner">✅ 今日のメニューはセット済み</div>
     <div class="hero">
       <div class="place" id="rPlace"></div>
       <div class="title" id="rTitle"></div>
@@ -136,18 +147,24 @@
       <div class="menu-item"><span class="n">前</span><span>プレハブ3〜4分：片脚カーフレイズ各15×2／足首壁ドリル各10／レッグスイング各10</span></div>
       <div class="menu-item"><span class="n">後</span><span>水シャワー2分 → 瞑想10分</span></div>
     </div>
-    <button class="btn" onclick="finish()">このメニューでやる 💪</button>
-    <button class="btn ghost" onclick="restart()">答え直す</button>
+    <div id="histBox4"></div>
+    <div id="confirmBtns">
+      <button class="btn" onclick="finish()">このメニューでやる 💪</button>
+      <button class="btn ghost" onclick="go(1)">質問に答え直す</button>
+      <button class="btn sub" onclick="go(6)">一覧から選び直す</button>
+    </div>
+    <div id="doneBtns" style="display:none">
+      <button class="btn sub" onclick="go(6)">メニューを変更する（一覧から）</button>
+      <button class="btn sub" onclick="go(1)">質問に答え直す</button>
+    </div>
   </div>
 
-  <!-- DONE -->
-  <div class="screen" id="s5">
-    <div class="done-icon">🔥</div>
-    <div class="cheer" id="doneCheer"></div>
-    <div class="card" style="text-align:center;font-size:14px;color:var(--sub)">
-      記録しました。行ってらっしゃい！<br>今日の積み上げが、1年後のあなたを作ります。
-    </div>
-    <button class="btn ghost" onclick="restart()">最初に戻る</button>
+  <!-- MANUAL PICK -->
+  <div class="screen" id="s6">
+    <div class="q">今日のメニューを選ぶ</div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:12px">体調や事情に合わせて自由に。休むのも立派な選択です。</div>
+    <div class="opts" id="repList"></div>
+    <button class="btn sub" onclick="go(0)" style="margin-top:14px">戻る</button>
   </div>
 
 </div>
@@ -156,11 +173,13 @@
 "use strict";
 const state = { wake: 2, load: 2, rain: false };
 const today = new Date();
+const todayStr = today.toISOString().slice(0, 10);
 const dow = today.getDay(); // 0=Sun
 const DAYS = ["日","月","火","水","木","金","土"];
+const K_TODAY = "asakatsu_today";
+const K_HIST = "asakatsu_history";
 
 // ---- 週次テンプレ（v2設計）----
-// type: strength(ジム筋力) / gymrun(ジム:ラン+筋トレ軽) / outdoor(外イージー) / lightest(最軽量) / recovery(回復)
 const TEMPLATE = {
   1: { type:"strength", place:"ジム", title:"筋力デー",
        menu:["トレッドミル歩き 10分（ウォームアップ）","チェストプレス 45kg 15×3","スクワットマシン 60kg 15×3","ラットプルダウン 45kg 15×3"] },
@@ -182,17 +201,25 @@ const HOME_A = ["プッシュアップ 15×3","自重スクワット 20×3","グ
 const HOME_B = ["自重タバタ 4分","スクワット 3分","プッシュアップ 3分"];
 const MINIMAL = ["自宅タバタ 4分だけでOK","＋プレハブは必ず"];
 
+// ---- 手動選択レパートリー ----
+const REPERTOIRE = [
+  { emoji:"🏋️", place:"ジム", title:"筋力フル", menu:["トレッドミル歩き 10分","チェストプレス 45kg 15×3","スクワットマシン 60kg 15×3","ラットプルダウン 45kg 15×3"] },
+  { emoji:"🏃", place:"ジム", title:"ラン5km＋筋トレ軽め", menu:["ラン 5km","筋トレ3種 各15×2（軽め・フォーム重視）"] },
+  { emoji:"🏃", place:"外", title:"イージーラン", menu:["イージーラン（ゆっくり長め可）"] },
+  { emoji:"🚶", place:"外", title:"早歩き・軽ジョグ", menu:["早歩き or 会話ペースの軽ジョグ 20〜25分"] },
+  { emoji:"🧘", place:"家周辺", title:"最軽量（歩き＋瞑想）", menu:["早歩き 15分","瞑想を長めに（15分〜）"] },
+  { emoji:"💪", place:"家", title:"自宅A（筋力サーキット）", menu: HOME_A },
+  { emoji:"🔥", place:"家", title:"自宅B（有酸素サーキット）", menu: HOME_B },
+  { emoji:"⏱", place:"家", title:"最小（タバタのみ）", menu: MINIMAL },
+  { emoji:"🛌", place:"家", title:"完全休養", menu:["今日は休む。それも計画のうち","やるなら軽いモビリティ・ストレッチだけ","水分補給をしっかり"] }
+];
+
 const CHEERS = [
   "4時半に起きている時点で、もう上位1%です。",
   "今日も「続けている自分」に一票入れましょう。",
   "完璧じゃなくていい。続くことが最強です。",
   "昨日の自分より1mm前へ。それで十分。",
   "この積み重ねが、仕事の集中力を作っています。"
-];
-const DONE_CHEERS = [
-  "決めたら迷わない。あとは体を動かすだけ！",
-  "いい選択です。今日も淡々と積み上げましょう。",
-  "スタートを切った人だけが積み上がる。ナイス判断！"
 ];
 
 // ---- メッセージ（曜日イベント）----
@@ -204,21 +231,19 @@ function specialNotes() {
   return notes;
 }
 
-// ---- メニュー決定エンジン ----
+// ---- メニュー決定エンジン（質問経由）----
 function buildPlan() {
   const base = TEMPLATE[dow];
-  let level = 2; // 2=標準
+  let level = 2;
   if (state.wake === 1) level--;
   if (state.load === 3) level--;
   if (state.wake === 3 && state.load === 1) level++;
-  // 水曜は絶対に上げない
   if (dow === 3) level = Math.min(level, 2);
 
   let place = base.place, title = base.title, menu = [...base.menu], msg = "";
   const isStrengthDay = ["strength","gymrun"].includes(base.type);
   const isCardioDay = ["outdoor","outdoor_run"].includes(base.type);
 
-  // 雨 → 家に置換
   if (state.rain) {
     place = "家";
     if (isStrengthDay) { title += "（雨・自宅A）"; menu = [...HOME_A]; if (base.type==="gymrun") menu.push("※ランは無し。木曜の1本は土曜に質を寄せる"); }
@@ -227,7 +252,6 @@ function buildPlan() {
     msg = "雨の日は迷わず家で完結。これも設計のうちです。";
   }
 
-  // レベル調整
   if (level <= 0) {
     title = "最小デー"; place = "家"; menu = [...MINIMAL];
     msg = "今日は攻めない日。週にバッファはあるので、堂々と落としてOK。";
@@ -242,47 +266,83 @@ function buildPlan() {
   }
   if (!msg) msg = CHEERS[Math.floor(Math.random() * CHEERS.length)];
 
-  // 前日との連続負荷チェック
-  const hist = JSON.parse(localStorage.getItem("asakatsu_history") || "[]");
+  const hist = getHist();
   const last = hist[hist.length - 1];
-  if (last && last.ran && (base.type === "gymrun" || base.type === "outdoor_run") && !state.rain && level <= 2) {
-    menu.push("※昨日も走っています。脚に違和感があれば早歩きに置き換え");
+  if (last && last.ran && last.date !== todayStr && (base.type === "gymrun" || base.type === "outdoor_run") && !state.rain && level <= 2) {
+    menu.push("※前回も走っています。脚に違和感があれば早歩きに置き換え");
   }
-  return { place, title, menu, msg };
+  return { date: todayStr, place, title, menu, msg, done: false };
+}
+
+// ---- 保存・履歴 ----
+function getHist() { return JSON.parse(localStorage.getItem(K_HIST) || "[]"); }
+function getToday() {
+  const t = JSON.parse(localStorage.getItem(K_TODAY) || "null");
+  return (t && t.date === todayStr) ? t : null;
+}
+function saveToday(plan) { localStorage.setItem(K_TODAY, JSON.stringify(plan)); }
+function saveHist(plan) {
+  let hist = getHist().filter(h => h.date !== todayStr); // 同日は上書き
+  const ran = /ラン|ジョグ/.test(plan.menu.join()) && !/走らなくてOK/.test(plan.menu.join());
+  hist.push({ date: todayStr, day: DAYS[dow], title: plan.title, ran });
+  localStorage.setItem(K_HIST, JSON.stringify(hist.slice(-60)));
 }
 
 // ---- UI ----
+let currentPlan = null;
+
 function go(n) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   document.getElementById("s" + n).classList.add("active");
   window.scrollTo(0, 0);
+  if (n === 0) init();
+  if (n === 6) renderRepertoire();
 }
 function ans(key, val) {
   state[key] = val;
   if (key === "wake") go(2);
   else if (key === "load") go(3);
-  else { renderResult(); go(4); }
+  else { showPlan(buildPlan()); }
 }
-let currentPlan = null;
-function renderResult() {
-  currentPlan = buildPlan();
-  document.getElementById("rPlace").textContent = "📍 " + currentPlan.place;
-  document.getElementById("rTitle").textContent = DAYS[dow] + "曜｜" + currentPlan.title;
-  document.getElementById("rMsg").textContent = currentPlan.msg;
-  document.getElementById("rMenu").innerHTML = currentPlan.menu
+function showPlan(plan) {
+  currentPlan = plan;
+  saveToday(plan); // 決定時点で永続化（リロード・再訪問でもリセットされない）
+  document.getElementById("rPlace").textContent = "📍 " + plan.place;
+  document.getElementById("rTitle").textContent = DAYS[dow] + "曜｜" + plan.title;
+  document.getElementById("rMsg").textContent = plan.msg;
+  document.getElementById("rMenu").innerHTML = plan.menu
     .map((m, i) => `<div class="menu-item"><span class="n">${i + 1}</span><span>${m}</span></div>`).join("");
   document.getElementById("rNotes").innerHTML = specialNotes()
     .map(n => `<div class="note ${n.cls}">${n.text}</div>`).join("");
+  document.getElementById("doneBanner").style.display = plan.done ? "block" : "none";
+  document.getElementById("confirmBtns").style.display = plan.done ? "none" : "block";
+  document.getElementById("doneBtns").style.display = plan.done ? "block" : "none";
+  renderHist("histBox4");
+  go(4);
 }
 function finish() {
-  const hist = JSON.parse(localStorage.getItem("asakatsu_history") || "[]");
-  const ran = /ラン|ジョグ/.test(currentPlan.menu.join()) && !/走らなくてOK/.test(currentPlan.menu.join());
-  hist.push({ date: today.toISOString().slice(0, 10), day: DAYS[dow], title: currentPlan.title, ran, ...state });
-  localStorage.setItem("asakatsu_history", JSON.stringify(hist.slice(-60)));
-  document.getElementById("doneCheer").textContent = DONE_CHEERS[Math.floor(Math.random() * DONE_CHEERS.length)];
-  go(5);
+  currentPlan.done = true;
+  currentPlan.msg = "決めたら迷わない。あとは体を動かすだけ！🔥";
+  saveToday(currentPlan);
+  saveHist(currentPlan);
+  showPlan(currentPlan);
 }
-function restart() { go(0); init(); }
+function pickManual(i) {
+  const r = REPERTOIRE[i];
+  showPlan({ date: todayStr, place: r.place, title: r.title, menu: [...r.menu],
+    msg: CHEERS[Math.floor(Math.random() * CHEERS.length)], done: false });
+}
+function renderRepertoire() {
+  document.getElementById("repList").innerHTML = REPERTOIRE
+    .map((r, i) => `<button class="opt compact" onclick="pickManual(${i})"><span class="emoji">${r.emoji}</span><span><b>${r.title}</b><small>📍 ${r.place}</small></span></button>`).join("");
+}
+function renderHist(boxId) {
+  const box = document.getElementById(boxId);
+  const items = getHist().filter(h => h.date !== todayStr).slice(-3).reverse();
+  if (!items.length) { box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="hist"><p class="hist-title" style="padding-top:8px">最近の記録 ✅</p>` +
+    items.map(h => `<div class="hist-item"><span class="d">${h.date.slice(5).replace("-","/")} ${h.day}</span><span>${h.title}</span></div>`).join("") + `</div>`;
+}
 
 function init() {
   const h = today.getHours();
@@ -290,15 +350,14 @@ function init() {
     h < 10 ? "おはようございます 🌅" : h < 18 ? "こんにちは ☀️" : "こんばんは 🌙";
   document.getElementById("dateLabel").textContent =
     `${today.getMonth() + 1}月${today.getDate()}日（${DAYS[dow]}）`;
-  const hist = JSON.parse(localStorage.getItem("asakatsu_history") || "[]");
-  const last = hist[hist.length - 1];
-  const box = document.getElementById("yesterdayBox");
-  if (last && last.date !== today.toISOString().slice(0, 10)) {
-    box.style.display = "block";
-    box.innerHTML = `前回：${last.day}曜「${last.title}」を実施 ✅ ちゃんと続いています。`;
-  } else { box.style.display = "none"; }
+  renderHist("histBox0");
 }
+
+// 起動時：今日のプランが既にあれば結果画面に直行（オートメーションで開き直してもリセットされない）
 init();
+const saved = getToday();
+if (saved) showPlan(saved);
+
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 </script>
 </body>
