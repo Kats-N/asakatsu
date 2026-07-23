@@ -53,6 +53,7 @@
   }
   .hero .place { font-size: 13px; opacity: .85; letter-spacing: .1em; }
   .hero .title { font-size: 21px; font-weight: 800; margin: 2px 0 6px; }
+  .hero .lvl { display:inline-block; background:rgba(255,255,255,.2); border-radius:20px; padding:1px 10px; font-size:12px; margin-bottom:6px; }
   .hero .msg { font-size: 14px; opacity: .95; }
   .done-banner {
     background: #eaf6ef; border: 2px solid var(--green); color: var(--green-d);
@@ -112,10 +113,11 @@
   <div class="screen" id="s2">
     <div class="progress"><span class="on"></span><span class="on"></span><span></span></div>
     <div class="q">今日の仕事・予定の負荷は？</div>
+    <div style="font-size:13px;color:var(--sub);margin:-8px 0 12px">高稼働の日は、運動でスイッチを入れて臨みます（寝不足のときは自動で軽くします）。</div>
     <div class="opts">
       <button class="opt" onclick="ans('load',1)"><span class="emoji">🟢</span><span>軽め<small>余裕がある日</small></span></button>
       <button class="opt" onclick="ans('load',2)"><span class="emoji">🟡</span><span>ふつう<small>通常運転</small></span></button>
-      <button class="opt" onclick="ans('load',3)"><span class="emoji">🔴</span><span>重い<small>会議・締切・気を張る日</small></span></button>
+      <button class="opt" onclick="ans('load',3)"><span class="emoji">🔴</span><span>重い<small>会議・締切・気を張る日 → しっかり動いて臨む</small></span></button>
     </div>
   </div>
 
@@ -135,6 +137,7 @@
     <div class="hero">
       <div class="place" id="rPlace"></div>
       <div class="title" id="rTitle"></div>
+      <div><span class="lvl" id="rLvl"></span></div>
       <div class="msg" id="rMsg"></div>
     </div>
     <div id="rNotes"></div>
@@ -178,41 +181,88 @@ const dow = today.getDay(); // 0=Sun
 const DAYS = ["日","月","火","水","木","金","土"];
 const K_TODAY = "asakatsu_today";
 const K_HIST = "asakatsu_history";
+const LVL_NAME = ["最小", "軽め", "標準", "ハード"];
 
-// ---- 週次テンプレ（v2設計）----
+// ---- 週次テンプレ（v4：ジム週4・木/日は回復補正あり）----
+// cat: strength / cardio / light
 const TEMPLATE = {
-  1: { type:"strength", place:"ジム", title:"筋力デー",
-       menu:["トレッドミル歩き 10分（ウォームアップ）","チェストプレス 45kg 15×3","スクワットマシン 60kg 15×3","ラットプルダウン 45kg 15×3"] },
-  2: { type:"outdoor", place:"外", title:"イージーデー",
-       menu:["早歩き or 会話ペースの軽ジョグ 20〜25分","低強度厳守。今日は「回復させながら動かす」日"] },
-  3: { type:"lightest", place:"家周辺", title:"最軽量デー",
-       menu:["早歩き 15分","瞑想を長めに（15分〜）"] },
-  4: { type:"gymrun", place:"ジム", title:"本命ランデー",
-       menu:["ラン 5km（今週の質の1本）","筋トレ3種 各15×2（軽め・フォーム重視）"] },
-  5: { type:"strength", place:"ジム", title:"筋力デー",
-       menu:["筋トレ3種 各15×3","余裕があれば傾斜ウォーク 15分"] },
-  6: { type:"outdoor_run", place:"外", title:"イージーランデー",
-       menu:["イージーラン（ゆっくり長め可）","家族の予定に合わせて時間は柔軟に"] },
-  0: { type:"recovery", place:"家", title:"回復デー",
-       menu:["自重タバタ 4分","スクワット 3分","プッシュアップ 3分","（または完全休養＋モビリティ10分）"] }
+  1: { cat:"strength", place:"ジム", title:"筋力デー" },
+  2: { cat:"cardio",   place:"外",   title:"イージーデー" },
+  3: { cat:"light",    place:"家周辺", title:"最軽量デー" },
+  4: { cat:"strength", place:"ジム", title:"筋力デー（断食明け）", fasting:true },
+  5: { cat:"strength", place:"ジム", title:"筋力デー" },
+  6: { cat:"cardio",   place:"外",   title:"持久ランデー", endurance:true },
+  0: { cat:"strength", place:"ジム", title:"筋力デー（週末）" }
 };
 
 const HOME_A = ["プッシュアップ 15×3","自重スクワット 20×3","グッドモーニング 15×3","※3秒かけて下ろすテンポで負荷を出す"];
 const HOME_B = ["自重タバタ 4分","スクワット 3分","プッシュアップ 3分"];
-const MINIMAL = ["自宅タバタ 4分だけでOK","＋プレハブは必ず"];
 
-// ---- 手動選択レパートリー ----
-const REPERTOIRE = [
-  { emoji:"🏋️", place:"ジム", title:"筋力フル", menu:["トレッドミル歩き 10分","チェストプレス 45kg 15×3","スクワットマシン 60kg 15×3","ラットプルダウン 45kg 15×3"] },
-  { emoji:"🏃", place:"ジム", title:"ラン5km＋筋トレ軽め", menu:["ラン 5km","筋トレ3種 各15×2（軽め・フォーム重視）"] },
-  { emoji:"🏃", place:"外", title:"イージーラン", menu:["イージーラン（ゆっくり長め可）"] },
-  { emoji:"🚶", place:"外", title:"早歩き・軽ジョグ", menu:["早歩き or 会話ペースの軽ジョグ 20〜25分"] },
-  { emoji:"🧘", place:"家周辺", title:"最軽量（歩き＋瞑想）", menu:["早歩き 15分","瞑想を長めに（15分〜）"] },
-  { emoji:"💪", place:"家", title:"自宅A（筋力サーキット）", menu: HOME_A },
-  { emoji:"🔥", place:"家", title:"自宅B（有酸素サーキット）", menu: HOME_B },
-  { emoji:"⏱", place:"家", title:"最小（タバタのみ）", menu: MINIMAL },
-  { emoji:"🛌", place:"家", title:"完全休養", menu:["今日は休む。それも計画のうち","やるなら軽いモビリティ・ストレッチだけ","水分補給をしっかり"] }
-];
+// ---- レベル→メニュー ----
+function strengthMenu(level, fasting) {
+  const warm = fasting ? "トレッドミル歩き 12〜15分（血圧を立ち上げる）" : "トレッドミル歩き 10分";
+  if (level <= 0) return ["ジムは軽く or 自宅タバタ 4分","無理なら休養＋モビリティ", fasting ? "電解質と水を先に" : ""].filter(Boolean);
+  const sets = level >= 2 ? "15×3" : "15×2";
+  const m = [warm, `チェストプレス 45kg ${sets}`, `スクワットマシン 60kg ${sets}`, `ラットプルダウン 45kg ${sets}`];
+  if (level >= 3) m.push("最終セットは丁寧に追い込み");
+  if (fasting) m.push("断食明け：しんどければ即中断。無理は禁物");
+  return m;
+}
+function cardioMenu(level, endurance) {
+  if (level <= 0) return ["早歩き 15〜20分 or 休養"];
+  if (level === 1) return ["早歩き or 会話ペースの軽ジョグ 20〜25分"];
+  if (level === 2) return endurance ? ["イージーラン（ゆっくり長め可）","今週の持久ベース"] : ["イージーラン（ゆっくり長め可）"];
+  return ["ラン（少し長め or 速め、+1kmまで）","怪我予防優先。脚に違和感があれば即歩きに"];
+}
+function lightMenu(level) {
+  if (level <= 0) return ["室内モビリティ＋瞑想のみ"];
+  return ["早歩き 15分","瞑想を長めに（15分〜）"];
+}
+
+// ---- レベル計算（v4ロジック）----
+function calcLevel() {
+  let level = 2; // 基準＝テンプレ標準
+  // 1. 安全弁（睡眠・エネルギー）
+  if (state.wake === 1) level -= 1;
+  if (state.wake === 3 && state.load <= 2) level += 1;
+  // 2. アクセル（稼働）— 寝不足なら効かない
+  if (state.load === 3 && state.wake >= 2) level += 1;
+  // 3. 曜日の生理補正
+  if (dow === 4) level -= 1;               // 断食明け木曜
+  if (dow === 0) level -= 1;               // 週末日曜（回復・飲酒明け配慮）
+  if (dow === 3) level = Math.min(level, 1); // 水曜断食＋会議
+  return Math.max(0, Math.min(3, level));
+}
+
+// ---- メニュー決定 ----
+function buildPlan() {
+  const base = TEMPLATE[dow];
+  const level = calcLevel();
+  let place = base.place, title = base.title, menu;
+
+  if (state.rain) {
+    place = "家";
+    if (base.cat === "strength") menu = level <= 0 ? [...HOME_B] : HOME_A.map(m => level === 1 ? m.replace("×3","×2") : m);
+    else if (base.cat === "cardio") menu = [...HOME_B];
+    else menu = ["室内モビリティ 10分","瞑想を長めに"];
+    title += "（雨・自宅）";
+  } else {
+    if (base.cat === "strength") menu = strengthMenu(level, base.fasting);
+    else if (base.cat === "cardio") menu = cardioMenu(level, base.endurance);
+    else menu = lightMenu(level);
+  }
+
+  return { date: todayStr, place, title, menu, level, msg: pickMsg(level, base), done: false };
+}
+
+function pickMsg(level, base) {
+  if (base.fasting) return "断食明けの朝。エネルギーと血圧が低い前提で、ウォームアップ長め・無理は禁物です。";
+  if (state.wake === 1) return "寝不足の朝は軽くして正解。回復も立派なトレーニングです。";
+  if (state.load === 3 && level >= 2) return "重い一日。運動でスイッチを入れて、良い状態で仕事へ。💪";
+  if (level >= 3) return "コンディション良好。今日は少し攻めてOK（怪我予防だけは優先）。";
+  if (dow === 0) return "週末は回復寄りに。淡々と積み上げる日です。";
+  return CHEERS[Math.floor(Math.random() * CHEERS.length)];
+}
 
 const CHEERS = [
   "4時半に起きている時点で、もう上位1%です。",
@@ -222,56 +272,14 @@ const CHEERS = [
   "この積み重ねが、仕事の集中力を作っています。"
 ];
 
-// ---- メッセージ（曜日イベント）----
+// ---- 曜日イベントの注意書き ----
 function specialNotes() {
   const notes = [];
-  if (dow === 3) notes.push({cls:"", text:"🍵 <b>今日はファスティングデー。</b>空腹は「効いてる」サイン。コーヒーとサプリで整えつつ、会議も乗り切りましょう。集中力はむしろ味方です。"});
-  if ([2,6,0].includes(dow)) notes.push({cls:"red", text:"🍺 <b>飲酒明けの可能性がある朝。</b>飲んだ翌朝なら強度を1段落としてOK。まず水をコップ1杯から。"});
-  if ([1,5,6].includes(dow)) notes.push({cls:"blue", text:"🌙 <b>今夜は晩酌OKの日。</b>ヒント：飲む前に水500ml／就寝3時間前までに切り上げ／量は「気持ちよく話せる範囲」まで。明朝の自分への仕送りです。"});
+  if (dow === 3) notes.push({cls:"", text:"🍵 <b>今日はファスティングデー。</b>空腹は「効いてる」サイン。コーヒーとサプリで整えつつ、会議も乗り切りましょう。"});
+  if (dow === 4) notes.push({cls:"", text:"🍽 <b>断食明けの朝。</b>糖質が枯れています。運動前に少し水分・電解質を。物足りなくても今日はこれで十分。"});
+  if ([2,6,0].includes(dow)) notes.push({cls:"red", text:"🍺 <b>飲酒明けの可能性がある朝。</b>飲んだ翌朝なら「目覚めイマイチ」を選べば自動で軽くなります。まず水をコップ1杯。"});
+  if ([1,5,6].includes(dow)) notes.push({cls:"blue", text:"🌙 <b>今夜は晩酌OKの日。</b>飲む前に水500ml／就寝3時間前までに切り上げ／量は気持ちよく話せる範囲まで。"});
   return notes;
-}
-
-// ---- メニュー決定エンジン（質問経由）----
-function buildPlan() {
-  const base = TEMPLATE[dow];
-  let level = 2;
-  if (state.wake === 1) level--;
-  if (state.load === 3) level--;
-  if (state.wake === 3 && state.load === 1) level++;
-  if (dow === 3) level = Math.min(level, 2);
-
-  let place = base.place, title = base.title, menu = [...base.menu], msg = "";
-  const isStrengthDay = ["strength","gymrun"].includes(base.type);
-  const isCardioDay = ["outdoor","outdoor_run"].includes(base.type);
-
-  if (state.rain) {
-    place = "家";
-    if (isStrengthDay) { title += "（雨・自宅A）"; menu = [...HOME_A]; if (base.type==="gymrun") menu.push("※ランは無し。木曜の1本は土曜に質を寄せる"); }
-    else if (isCardioDay) { title += "（雨・自宅B）"; menu = [...HOME_B]; }
-    else if (base.type === "lightest") { title += "（雨）"; menu = ["室内モビリティ 10分","瞑想を長めに"]; }
-    msg = "雨の日は迷わず家で完結。これも設計のうちです。";
-  }
-
-  if (level <= 0) {
-    title = "最小デー"; place = "家"; menu = [...MINIMAL];
-    msg = "今日は攻めない日。週にバッファはあるので、堂々と落としてOK。";
-  } else if (level === 1) {
-    if (isStrengthDay && !state.rain) { menu = menu.map(m => m.replace("15×3","15×2")); msg = "セットを1つ減らして質を優先。それで十分です。"; }
-    if (isCardioDay && !state.rain) { menu = ["早歩き 20分（走らなくてOK）"]; msg = "今日は歩きで正解。持久力は逃げません。"; }
-    if (base.type === "gymrun" && !state.rain) { menu = ["傾斜ウォーク or 軽ジョグ 20分","筋トレは各15×2のまま or 省略可"]; msg = "本命ランは無理しない。来週も木曜は来ます。"; }
-  } else if (level >= 3) {
-    if (isStrengthDay && !state.rain) msg = "コンディション良好。最終セットだけ丁寧に追い込んでみましょう。";
-    else if (isCardioDay && !state.rain) msg = "調子が良い日。ただし+1kmまで。怪我予防が最優先です。";
-    else msg = "良い状態。でも今日の設計は守るのが吉です。";
-  }
-  if (!msg) msg = CHEERS[Math.floor(Math.random() * CHEERS.length)];
-
-  const hist = getHist();
-  const last = hist[hist.length - 1];
-  if (last && last.ran && last.date !== todayStr && (base.type === "gymrun" || base.type === "outdoor_run") && !state.rain && level <= 2) {
-    menu.push("※前回も走っています。脚に違和感があれば早歩きに置き換え");
-  }
-  return { date: todayStr, place, title, menu, msg, done: false };
 }
 
 // ---- 保存・履歴 ----
@@ -282,11 +290,25 @@ function getToday() {
 }
 function saveToday(plan) { localStorage.setItem(K_TODAY, JSON.stringify(plan)); }
 function saveHist(plan) {
-  let hist = getHist().filter(h => h.date !== todayStr); // 同日は上書き
-  const ran = /ラン|ジョグ/.test(plan.menu.join()) && !/走らなくてOK/.test(plan.menu.join());
+  let hist = getHist().filter(h => h.date !== todayStr);
+  const ran = /ラン|ジョグ/.test(plan.menu.join()) && !/走らなくてOK|歩き/.test(plan.menu.join());
   hist.push({ date: todayStr, day: DAYS[dow], title: plan.title, ran });
   localStorage.setItem(K_HIST, JSON.stringify(hist.slice(-60)));
 }
+
+// ---- 手動選択レパートリー ----
+const REPERTOIRE = [
+  { emoji:"🏋️", place:"ジム", title:"筋力フル", menu:["トレッドミル歩き 10分","チェストプレス 45kg 15×3","スクワットマシン 60kg 15×3","ラットプルダウン 45kg 15×3"] },
+  { emoji:"🏋️", place:"ジム", title:"筋力（軽め・断食明け向き）", menu:["トレッドミル歩き 12〜15分","筋トレ3種 各15×2","無理なら中断・電解質"] },
+  { emoji:"🏃", place:"外", title:"イージーラン", menu:["イージーラン（ゆっくり長め可）"] },
+  { emoji:"🏃", place:"外", title:"ラン（攻め）", menu:["ラン（少し長め or 速め、+1kmまで）","怪我予防だけは優先"] },
+  { emoji:"🚶", place:"外", title:"早歩き・軽ジョグ", menu:["早歩き or 会話ペースの軽ジョグ 20〜25分"] },
+  { emoji:"🧘", place:"家周辺", title:"最軽量（歩き＋瞑想）", menu:["早歩き 15分","瞑想を長めに（15分〜）"] },
+  { emoji:"💪", place:"家", title:"自宅A（筋力サーキット）", menu: HOME_A },
+  { emoji:"🔥", place:"家", title:"自宅B（有酸素サーキット）", menu: HOME_B },
+  { emoji:"⏱", place:"家", title:"最小（タバタのみ）", menu:["自宅タバタ 4分だけでOK","＋プレハブは必ず"] },
+  { emoji:"🛌", place:"家", title:"完全休養", menu:["今日は休む。それも計画のうち","やるなら軽いモビリティ・ストレッチだけ","水分補給をしっかり"] }
+];
 
 // ---- UI ----
 let currentPlan = null;
@@ -302,13 +324,14 @@ function ans(key, val) {
   state[key] = val;
   if (key === "wake") go(2);
   else if (key === "load") go(3);
-  else { showPlan(buildPlan()); }
+  else showPlan(buildPlan());
 }
 function showPlan(plan) {
   currentPlan = plan;
-  saveToday(plan); // 決定時点で永続化（リロード・再訪問でもリセットされない）
+  saveToday(plan);
   document.getElementById("rPlace").textContent = "📍 " + plan.place;
   document.getElementById("rTitle").textContent = DAYS[dow] + "曜｜" + plan.title;
+  document.getElementById("rLvl").textContent = "強度：" + (LVL_NAME[plan.level] || "標準");
   document.getElementById("rMsg").textContent = plan.msg;
   document.getElementById("rMenu").innerHTML = plan.menu
     .map((m, i) => `<div class="menu-item"><span class="n">${i + 1}</span><span>${m}</span></div>`).join("");
@@ -330,7 +353,7 @@ function finish() {
 function pickManual(i) {
   const r = REPERTOIRE[i];
   showPlan({ date: todayStr, place: r.place, title: r.title, menu: [...r.menu],
-    msg: CHEERS[Math.floor(Math.random() * CHEERS.length)], done: false });
+    level: 2, msg: CHEERS[Math.floor(Math.random() * CHEERS.length)], done: false });
 }
 function renderRepertoire() {
   document.getElementById("repList").innerHTML = REPERTOIRE
@@ -353,7 +376,6 @@ function init() {
   renderHist("histBox0");
 }
 
-// 起動時：今日のプランが既にあれば結果画面に直行（オートメーションで開き直してもリセットされない）
 init();
 const saved = getToday();
 if (saved) showPlan(saved);
