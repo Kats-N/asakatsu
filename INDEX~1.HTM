@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="theme-color" content="#1f4d38">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>朝活コーチ</title>
+<style>
+  :root {
+    --green: #2f6f4f; --green-d: #1f4d38; --green-l: #eaf3ee;
+    --ink: #22303a; --sub: #64748b; --card: #ffffff;
+    --amber: #b45309; --red: #c0492f; --blue: #1d6fa5; --purple: #6d4aa5;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; font-family: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: linear-gradient(160deg, #f2f7f4 0%, #e8f0ea 100%);
+    color: var(--ink); min-height: 100vh; font-size: 16px; line-height: 1.6;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 20px 18px 40px; }
+  .screen { display: none; animation: fade .35s ease; }
+  .screen.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  h1 { font-size: 22px; color: var(--green-d); margin: 4px 0 2px; }
+  .date { color: var(--sub); font-size: 14px; margin-bottom: 18px; }
+  .q { font-size: 19px; font-weight: 700; color: var(--green-d); margin: 24px 0 14px; }
+  .opts { display: flex; flex-direction: column; gap: 10px; }
+  .opt {
+    background: var(--card); border: 2px solid #d8e3dc; border-radius: 14px;
+    padding: 16px 18px; font-size: 17px; text-align: left; cursor: pointer;
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    transition: border-color .15s, transform .1s;
+  }
+  .opt:active { transform: scale(.98); border-color: var(--green); }
+  .opt .emoji { font-size: 24px; }
+  .opt small { display: block; color: var(--sub); font-size: 13px; }
+  .opt.compact { padding: 12px 16px; font-size: 15px; }
+  .card {
+    background: var(--card); border-radius: 16px; padding: 18px;
+    box-shadow: 0 2px 10px rgba(31,77,56,.08); margin-bottom: 14px;
+  }
+  .card h2 { font-size: 15px; color: var(--green); margin: 0 0 8px; }
+  .menu-item { padding: 9px 0; border-bottom: 1px dashed #e2e8f0; display: flex; gap: 10px; align-items: baseline; }
+  .menu-item:last-child { border-bottom: none; }
+  .menu-item .n { color: var(--green); font-weight: 700; min-width: 1.3em; }
+  .hero {
+    background: linear-gradient(135deg, var(--green-d), var(--green));
+    color: #fff; border-radius: 16px; padding: 18px; margin-bottom: 14px;
+  }
+  .hero.gacha { background: linear-gradient(135deg, #4a2f6f, var(--purple)); }
+  .hero .place { font-size: 13px; opacity: .85; letter-spacing: .1em; }
+  .hero .title { font-size: 21px; font-weight: 800; margin: 2px 0 6px; }
+  .hero .lvl { display:inline-block; background:rgba(255,255,255,.2); border-radius:20px; padding:1px 10px; font-size:12px; margin-bottom:6px; }
+  .hero .msg { font-size: 14px; opacity: .95; }
+  .done-banner {
+    background: #eaf6ef; border: 2px solid var(--green); color: var(--green-d);
+    border-radius: 14px; padding: 12px 16px; font-weight: 700; font-size: 15px;
+    margin-bottom: 14px; text-align: center;
+  }
+  .note { border-left: 4px solid var(--amber); background: #fdf6ec; border-radius: 0 10px 10px 0; padding: 10px 14px; font-size: 14px; margin-bottom: 12px; }
+  .note.blue { border-color: var(--blue); background: #eff6fc; }
+  .note.red { border-color: var(--red); background: #fdf1ee; }
+  .note b { color: var(--green-d); }
+  .btn {
+    display: block; width: 100%; background: var(--green); color: #fff;
+    border: none; border-radius: 14px; padding: 16px; font-size: 17px;
+    font-weight: 700; cursor: pointer; margin-top: 10px;
+  }
+  .btn.ghost { background: #fff; color: var(--green); border: 2px solid var(--green); }
+  .btn.sub { background: #fff; color: var(--sub); border: 2px solid #d8e3dc; font-size: 15px; padding: 12px; }
+  .btn.gacha { background: linear-gradient(135deg, #4a2f6f, var(--purple)); }
+  .btn:active { opacity: .85; }
+  .hist { background: #fff; border-radius: 12px; padding: 4px 14px; margin-bottom: 14px; }
+  .hist-item { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; font-size: 14px; }
+  .hist-item:last-child { border-bottom: none; }
+  .hist-item .d { color: var(--sub); font-size: 12px; min-width: 4.5em; }
+  .hist-title { font-size: 13px; color: var(--sub); margin: 0 0 2px; font-weight: 700; }
+  .progress { display: flex; gap: 6px; margin-bottom: 6px; }
+  .progress span { height: 5px; flex: 1; border-radius: 3px; background: #d8e3dc; }
+  .progress span.on { background: var(--green); }
+  .ex-row { display: flex; gap: 6px; align-items: center; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; }
+  .ex-row input[type=text] { flex: 1; min-width: 0; }
+  .ex-row input { border: 1px solid #d8e3dc; border-radius: 8px; padding: 8px; font-size: 14px; font-family: inherit; }
+  .ex-row input[type=number] { width: 58px; text-align: right; }
+  .ex-row .unit { font-size: 13px; color: var(--sub); }
+  .ex-row .del { background: none; border: none; color: var(--red); font-size: 18px; cursor: pointer; padding: 0 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- START -->
+  <div class="screen active" id="s0">
+    <h1 id="greeting">おはようございます 🌅</h1>
+    <div class="date" id="dateLabel"></div>
+    <div id="histBox0"></div>
+    <div class="card">
+      <h2>今日のあなたに合わせてメニューを組みます</h2>
+      <div style="font-size:14px;color:var(--sub)">3つ答えるだけ。30秒で終わります。</div>
+    </div>
+    <button class="btn" onclick="go(1)">はじめる</button>
+    <button class="btn gacha" onclick="gacha()">🎲 ランダムガチャで決める</button>
+    <button class="btn sub" onclick="go(6)">一覧から自分で選ぶ</button>
+    <button class="btn sub" onclick="go(7)">⚙️ 筋トレの重量・回数を設定</button>
+  </div>
+
+  <!-- Q1 wake -->
+  <div class="screen" id="s1">
+    <div class="progress"><span class="on"></span><span></span><span></span></div>
+    <div class="q">目覚めはどうですか？</div>
+    <div class="opts">
+      <button class="opt" onclick="ans('wake',3)"><span class="emoji">😊</span><span>スッキリ<small>よく眠れた・体が軽い</small></span></button>
+      <button class="opt" onclick="ans('wake',2)"><span class="emoji">😐</span><span>ふつう<small>いつも通り</small></span></button>
+      <button class="opt" onclick="ans('wake',1)"><span class="emoji">🥱</span><span>イマイチ<small>眠い・重い・疲れが残っている</small></span></button>
+    </div>
+  </div>
+
+  <!-- Q2 load -->
+  <div class="screen" id="s2">
+    <div class="progress"><span class="on"></span><span class="on"></span><span></span></div>
+    <div class="q">今日の仕事・予定の負荷は？</div>
+    <div style="font-size:13px;color:var(--sub);margin:-8px 0 12px">高稼働の日は、運動でスイッチを入れて臨みます（寝不足のときは自動で軽くします）。</div>
+    <div class="opts">
+      <button class="opt" onclick="ans('load',1)"><span class="emoji">🟢</span><span>軽め<small>余裕がある日</small></span></button>
+      <button class="opt" onclick="ans('load',2)"><span class="emoji">🟡</span><span>ふつう<small>通常運転</small></span></button>
+      <button class="opt" onclick="ans('load',3)"><span class="emoji">🔴</span><span>重い<small>会議・締切・気を張る日 → しっかり動いて臨む</small></span></button>
+    </div>
+  </div>
+
+  <!-- Q3 weather -->
+  <div class="screen" id="s3">
+    <div class="progress"><span class="on"></span><span class="on"></span><span class="on"></span></div>
+    <div class="q">今朝の天気は？</div>
+    <div class="opts">
+      <button class="opt" onclick="ans('rain',false)"><span class="emoji">☀️</span><span>晴れ・くもり<small>外に出られる</small></span></button>
+      <button class="opt" onclick="ans('rain',true)"><span class="emoji">🌧</span><span>雨<small>今日は家で完結</small></span></button>
+    </div>
+  </div>
+
+  <!-- TODAY / RESULT -->
+  <div class="screen" id="s4">
+    <div id="doneBanner" style="display:none" class="done-banner">✅ 今日のメニューはセット済み</div>
+    <div class="hero" id="rHero">
+      <div class="place" id="rPlace"></div>
+      <div class="title" id="rTitle"></div>
+      <div><span class="lvl" id="rLvl"></span></div>
+      <div class="msg" id="rMsg"></div>
+    </div>
+    <div id="rNotes"></div>
+    <div class="card">
+      <h2>今日のメニュー</h2>
+      <div id="rMenu"></div>
+    </div>
+    <div class="card">
+      <h2>毎朝の固定ブロック</h2>
+      <div class="menu-item"><span class="n">前</span><span>プレハブ3〜4分：片脚カーフレイズ各15×2／足首壁ドリル各10／レッグスイング各10</span></div>
+      <div class="menu-item"><span class="n">後</span><span>水シャワー2分 → 瞑想10分</span></div>
+    </div>
+    <div id="histBox4"></div>
+    <div id="confirmBtns">
+      <button class="btn" onclick="finish()">このメニューでやる 💪</button>
+      <button class="btn gacha" id="rerollBtn" style="display:none" onclick="gacha()">🎲 もう一度引く</button>
+      <button class="btn ghost" onclick="go(1)">質問に答え直す</button>
+      <button class="btn sub" onclick="go(6)">一覧から選び直す</button>
+    </div>
+    <div id="doneBtns" style="display:none">
+      <button class="btn sub" onclick="go(6)">メニューを変更する（一覧から）</button>
+      <button class="btn sub" onclick="go(1)">質問に答え直す</button>
+    </div>
+  </div>
+
+  <!-- MANUAL PICK -->
+  <div class="screen" id="s6">
+    <div class="q">今日のメニューを選ぶ</div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:12px">体調や事情に合わせて自由に。休むのも立派な選択です。</div>
+    <div class="opts" id="repList"></div>
+    <button class="btn sub" onclick="go(0)" style="margin-top:14px">戻る</button>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="screen" id="s7">
+    <div class="q">筋トレの重量・回数</div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:12px">ここを変えると全メニューに反映されます。セット数は強度に応じて自動調整（標準3／軽め2）。</div>
+    <div class="card"><div id="exList"></div></div>
+    <button class="btn sub" onclick="addEx()">＋ 種目を追加</button>
+    <button class="btn" onclick="saveEx()">保存する</button>
+    <button class="btn sub" onclick="resetEx()">初期設定に戻す</button>
+    <button class="btn sub" onclick="go(0)">戻る</button>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+// ---- 日付（ローカル基準。UTCだと早朝が前日になるため）----
+function fmtDate(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+const today = new Date();
+const todayStr = fmtDate(today);
+const dow = today.getDay(); // 0=Sun
+const DAYS = ["日","月","火","水","木","金","土"];
+const LVL_NAME = ["最小", "軽め", "標準", "ハード"];
+const K_TODAY = "asakatsu_today";
+const K_HIST = "asakatsu_history";
+const K_EX = "asakatsu_exercises";
+const K_FIX = "asakatsu_datefix_v5";
+
+const state = { wake: 2, load: 2, rain: false };
+
+// ---- 種目設定 ----
+const DEFAULT_EX = [
+  { name: "チェストプレス", weight: 45, reps: 15 },
+  { name: "スクワットマシン", weight: 60, reps: 15 },
+  { name: "ラットプルダウン", weight: 45, reps: 15 }
+];
+function getEx() {
+  try {
+    const e = JSON.parse(localStorage.getItem(K_EX) || "null");
+    return (Array.isArray(e) && e.length) ? e : DEFAULT_EX.map(x => ({ ...x }));
+  } catch (_) { return DEFAULT_EX.map(x => ({ ...x })); }
+}
+function exLines(sets) {
+  return getEx().map(e => `${e.name} ${e.weight}kg ${e.reps}×${sets}`);
+}
+
+// ---- 週次テンプレ（v5：ジム=月・水・木・日）----
+const TEMPLATE = {
+  1: { cat:"gym_strength", place:"ジム", title:"筋力デー" },
+  2: { cat:"cardio",       place:"外",   title:"イージーランデー" },
+  3: { cat:"gym_run",      place:"ジム", title:"トレッドミルデー" },
+  4: { cat:"gym_strength", place:"ジム", title:"筋力デー（断食明け）", fasting:true },
+  5: { cat:"cardio",       place:"外",   title:"イージーランデー" },
+  6: { cat:"cardio",       place:"外",   title:"持久ランデー", endurance:true },
+  0: { cat:"gym_strength", place:"ジム", title:"筋力デー（週末）" }
+};
+
+const HOME_A = ["プッシュアップ 15×3","自重スクワット 20×3","グッドモーニング 15×3","※3秒かけて下ろすテンポで負荷を出す"];
+const HOME_B = ["自重タバタ 4分","スクワット 3分","プッシュアップ 3分"];
+
+// ---- レベル→メニュー ----
+function gymStrengthMenu(level, fasting) {
+  const warm = fasting ? "トレッドミル歩き 12〜15分（血圧を立ち上げる）" : "トレッドミル歩き 10分";
+  if (level <= 0) return ["ジムは軽く or 自宅タバタ 4分", "無理なら休養＋モビリティ", fasting ? "電解質と水を先に" : ""].filter(Boolean);
+  const sets = level >= 2 ? 3 : 2;
+  const m = [warm, ...exLines(sets)];
+  if (level >= 3) m.push("最終セットは丁寧に追い込み");
+  if (fasting) m.push("断食明け：しんどければ即中断。無理は禁物");
+  return m;
+}
+function gymRunMenu(level) {
+  if (level <= 0) return ["傾斜ウォーク 15〜20分", "無理はしない"];
+  if (level === 1) return ["トレッドミル 3km（ゆっくり）", "余裕があれば傾斜ウォーク追加"];
+  if (level === 2) return ["トレッドミル 5km", "終わりに軽くストレッチ"];
+  return ["トレッドミル 5〜6km（ペース速め）", "怪我予防だけは優先。違和感が出たら即ペースダウン"];
+}
+function cardioMenu(level, endurance) {
+  if (level <= 0) return ["早歩き 15〜20分 or 休養"];
+  if (level === 1) return ["早歩き〜会話ペースの軽ジョグ 20〜25分"];
+  if (level === 2) return endurance ? ["イージーラン（ゆっくり長め可）", "今週の持久ベース"] : ["イージーラン 5km前後（ゆっくり）"];
+  return ["ラン（少し長め or 速め、+1kmまで）", "怪我予防優先。脚に違和感があれば即歩きに"];
+}
+
+// ---- レベル計算（v5）----
+function calcLevel() {
+  let level = 2;
+  // 1. 安全弁（睡眠・エネルギー）
+  if (state.wake === 1) level -= 1;
+  if (state.wake === 3 && state.load <= 2) level += 1;
+  // 2. アクセル（稼働）— 寝不足なら効かない
+  if (state.load === 3 && state.wake >= 2) level += 1;
+  // 3. 曜日の生理補正
+  if (dow === 4) level -= 1; // 断食明け木曜
+  if (dow === 0) level -= 1; // 週末日曜（回復・飲酒明け配慮）
+  return Math.max(0, Math.min(3, level));
+}
+
+// ---- メニュー決定 ----
+function buildPlan() {
+  const base = TEMPLATE[dow];
+  const level = calcLevel();
+  let place = base.place, title = base.title, menu;
+
+  if (state.rain) {
+    place = "家";
+    if (base.cat === "gym_strength") menu = level <= 0 ? [...HOME_B] : HOME_A.map(m => level === 1 ? m.replace("×3", "×2") : m);
+    else menu = [...HOME_B];
+    title += "（雨・自宅）";
+  } else if (base.cat === "gym_strength") {
+    menu = gymStrengthMenu(level, base.fasting);
+  } else if (base.cat === "gym_run") {
+    menu = gymRunMenu(level);
+  } else {
+    menu = cardioMenu(level, base.endurance);
+  }
+
+  // 連続ラン検知
+  if (!state.rain && level >= 2 && ["cardio","gym_run"].includes(base.cat)) {
+    const last = getHist().filter(h => h.date !== todayStr).slice(-1)[0];
+    if (last && last.ran) menu = menu.concat(["※前回も走っています。脚に違和感があれば歩きに置き換え"]);
+  }
+  return { date: todayStr, place, title, menu, level, msg: pickMsg(level, base), done: false };
+}
+
+function pickMsg(level, base) {
+  if (base.fasting) return "断食明けの朝。エネルギーと血圧が低い前提で、ウォームアップ長め・無理は禁物です。";
+  if (state.wake === 1) return "寝不足の朝は軽くして正解。回復も立派なトレーニングです。";
+  if (state.load === 3 && level >= 2) return "重い一日。運動でスイッチを入れて、良い状態で仕事へ。💪";
+  if (level >= 3) return "コンディション良好。今日は少し攻めてOK（怪我予防だけは優先）。";
+  if (dow === 0) return "週末は回復寄りに。淡々と積み上げる日です。";
+  return CHEERS[Math.floor(Math.random() * CHEERS.length)];
+}
+
+const CHEERS = [
+  "4時半に起きている時点で、もう上位1%です。",
+  "今日も「続けている自分」に一票入れましょう。",
+  "完璧じゃなくていい。続くことが最強です。",
+  "昨日の自分より1mm前へ。それで十分。",
+  "この積み重ねが、仕事の集中力を作っています。"
+];
+const GACHA_MSG = [
+  "引いたからにはやるだけ。迷いはここで終わり。🎲",
+  "運命が決めました。あとは体を動かすのみ。",
+  "自分で選ぶと甘くなる。だから今日は運任せ。",
+  "出た目がその日の正解。淡々といきましょう。"
+];
+
+// ---- 曜日イベントの注意書き ----
+function specialNotes() {
+  const notes = [];
+  if (dow === 3) notes.push({cls:"", text:"🍵 <b>今日はファスティングデー。</b>朝は昨夜の食事が残っているので動けます。ただし次の食事は明日の夕方。今日は筋トレより有酸素向きです。"});
+  if (dow === 4) notes.push({cls:"", text:"🍽 <b>断食明けの朝。</b>糖質が枯れています。運動前に水分・電解質を。物足りなくても今日はこれで十分。"});
+  if ([2,6,0].includes(dow)) notes.push({cls:"red", text:"🍺 <b>飲酒明けの可能性がある朝。</b>飲んだ翌朝なら「目覚めイマイチ」を選べば自動で軽くなります。まず水をコップ1杯。"});
+  if ([1,5,6].includes(dow)) notes.push({cls:"blue", text:"🌙 <b>今夜は晩酌OKの日。</b>飲む前に水500ml／就寝3時間前までに切り上げ／量は気持ちよく話せる範囲まで。"});
+  return notes;
+}
+
+// ---- 保存・履歴 ----
+function getHist() { try { return JSON.parse(localStorage.getItem(K_HIST) || "[]"); } catch (_) { return []; } }
+function getToday() {
+  try {
+    const t = JSON.parse(localStorage.getItem(K_TODAY) || "null");
+    return (t && t.date === todayStr) ? t : null;
+  } catch (_) { return null; }
+}
+function saveToday(plan) { localStorage.setItem(K_TODAY, JSON.stringify(plan)); }
+function saveHist(plan) {
+  const hist = getHist().filter(h => h.date !== todayStr);
+  const j = plan.menu.join();
+  const ran = /ラン|ジョグ|トレッドミル \d/.test(j) && !/歩き 1|歩き〜/.test(j);
+  hist.push({ date: todayStr, day: DAYS[dow], title: plan.title, ran });
+  localStorage.setItem(K_HIST, JSON.stringify(hist.slice(-60)));
+}
+// 旧版（UTC基準）で保存された日付を1日補正する一度きりの移行
+function migrateDates() {
+  if (localStorage.getItem(K_FIX)) return;
+  const hist = getHist().map(h => {
+    const d = new Date(h.date + "T12:00:00");
+    d.setDate(d.getDate() + 1);
+    return { ...h, date: fmtDate(d) };
+  });
+  localStorage.setItem(K_HIST, JSON.stringify(hist));
+  localStorage.setItem(K_FIX, "1");
+}
+
+// ---- レパートリー（手動選択・ガチャ共通）----
+const REPERTOIRE = [
+  { emoji:"🏋️", place:"ジム", title:"ジム・筋力メイン", gacha:true, menu:() => ["トレッドミル歩き 10分", ...exLines(3)] },
+  { emoji:"🏃", place:"ジム", title:"ジム・トレッドミルメイン", gacha:true, menu:() => ["トレッドミル 5km", "終わりに軽くストレッチ"] },
+  { emoji:"⚡", place:"ジム", title:"ジム・ミックス（有酸素＋筋力）", gacha:true, menu:() => ["トレッドミル 3km", ...exLines(2)] },
+  { emoji:"🪶", place:"ジム", title:"ジム・筋力（軽め／断食明け向き）", gacha:true, menu:() => ["トレッドミル歩き 12〜15分", ...exLines(2), "無理なら中断・電解質"] },
+  { emoji:"🏃", place:"外", title:"イージーラン", gacha:true, menu:() => ["イージーラン 5km前後（ゆっくり）"] },
+  { emoji:"🔥", place:"外", title:"ラン（攻め）", gacha:true, menu:() => ["ラン（少し長め or 速め、+1kmまで）", "怪我予防だけは優先"] },
+  { emoji:"💪", place:"家", title:"自宅A（筋力サーキット）", gacha:true, menu:() => [...HOME_A] },
+  { emoji:"🔥", place:"家", title:"自宅B（有酸素サーキット）", gacha:true, menu:() => [...HOME_B] },
+  { emoji:"🧘", place:"家周辺", title:"最軽量（歩き＋瞑想）", gacha:false, menu:() => ["早歩き 15分", "瞑想を長めに（15分〜）"] },
+  { emoji:"⏱", place:"家", title:"最小（タバタのみ）", gacha:false, menu:() => ["自宅タバタ 4分だけでOK", "＋プレハブは必ず"] },
+  { emoji:"🛌", place:"家", title:"完全休養", gacha:false, menu:() => ["今日は休む。それも計画のうち", "やるなら軽いモビリティ・ストレッチだけ", "水分補給をしっかり"] }
+];
+
+// ---- UI ----
+let currentPlan = null;
+
+function go(n) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("s" + n).classList.add("active");
+  window.scrollTo(0, 0);
+  if (n === 0) init();
+  if (n === 6) renderRepertoire();
+  if (n === 7) renderEx();
+}
+function ans(key, val) {
+  state[key] = val;
+  if (key === "wake") go(2);
+  else if (key === "load") go(3);
+  else showPlan(buildPlan());
+}
+function showPlan(plan) {
+  currentPlan = plan;
+  saveToday(plan);
+  document.getElementById("rHero").className = "hero" + (plan.isGacha ? " gacha" : "");
+  document.getElementById("rPlace").textContent = (plan.isGacha ? "🎲 ガチャの結果｜📍 " : "📍 ") + plan.place;
+  document.getElementById("rTitle").textContent = DAYS[dow] + "曜｜" + plan.title;
+  document.getElementById("rLvl").textContent = "強度：" + (LVL_NAME[plan.level] || "標準");
+  document.getElementById("rMsg").textContent = plan.msg;
+  document.getElementById("rMenu").innerHTML = plan.menu
+    .map((m, i) => `<div class="menu-item"><span class="n">${i + 1}</span><span>${m}</span></div>`).join("");
+  document.getElementById("rNotes").innerHTML = specialNotes()
+    .map(n => `<div class="note ${n.cls}">${n.text}</div>`).join("");
+  document.getElementById("doneBanner").style.display = plan.done ? "block" : "none";
+  document.getElementById("confirmBtns").style.display = plan.done ? "none" : "block";
+  document.getElementById("doneBtns").style.display = plan.done ? "block" : "none";
+  document.getElementById("rerollBtn").style.display = (plan.isGacha && !plan.done) ? "block" : "none";
+  renderHist("histBox4");
+  go(4);
+}
+function finish() {
+  currentPlan.done = true;
+  currentPlan.msg = "決めたら迷わない。あとは体を動かすだけ！🔥";
+  saveToday(currentPlan);
+  saveHist(currentPlan);
+  showPlan(currentPlan);
+}
+function planFromRep(r, extra) {
+  return Object.assign({
+    date: todayStr, place: r.place, title: r.title, menu: r.menu(),
+    level: 2, msg: CHEERS[Math.floor(Math.random() * CHEERS.length)], done: false
+  }, extra || {});
+}
+function pickManual(i) { showPlan(planFromRep(REPERTOIRE[i])); }
+function gacha() {
+  const pool = REPERTOIRE.filter(r => r.gacha);
+  let r = pool[Math.floor(Math.random() * pool.length)];
+  // 同じ結果の連続を避ける
+  if (currentPlan && currentPlan.isGacha && pool.length > 1) {
+    let guard = 0;
+    while (r.title === currentPlan.title && guard++ < 10) r = pool[Math.floor(Math.random() * pool.length)];
+  }
+  showPlan(planFromRep(r, { isGacha: true, msg: GACHA_MSG[Math.floor(Math.random() * GACHA_MSG.length)] }));
+}
+function renderRepertoire() {
+  document.getElementById("repList").innerHTML = REPERTOIRE
+    .map((r, i) => `<button class="opt compact" onclick="pickManual(${i})"><span class="emoji">${r.emoji}</span><span><b>${r.title}</b><small>📍 ${r.place}</small></span></button>`).join("");
+}
+function renderHist(boxId) {
+  const box = document.getElementById(boxId);
+  const items = getHist().filter(h => h.date !== todayStr).slice(-3).reverse();
+  if (!items.length) { box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="hist"><p class="hist-title" style="padding-top:8px">最近の記録 ✅</p>` +
+    items.map(h => `<div class="hist-item"><span class="d">${h.date.slice(5).replace("-","/")} ${h.day}</span><span>${h.title}</span></div>`).join("") + `</div>`;
+}
+
+// ---- 設定画面 ----
+let editEx = [];
+function renderEx() {
+  editEx = getEx();
+  document.getElementById("exList").innerHTML = editEx.map((e, i) => `
+    <div class="ex-row">
+      <input type="text" value="${e.name.replace(/"/g,'&quot;')}" oninput="editEx[${i}].name=this.value">
+      <input type="number" value="${e.weight}" min="0" step="2.5" oninput="editEx[${i}].weight=parseFloat(this.value)||0">
+      <span class="unit">kg</span>
+      <input type="number" value="${e.reps}" min="1" step="1" oninput="editEx[${i}].reps=parseInt(this.value)||1">
+      <span class="unit">回</span>
+      <button class="del" onclick="delEx(${i})">×</button>
+    </div>`).join("");
+}
+function addEx() { editEx.push({ name: "新しい種目", weight: 20, reps: 15 }); localStorage.setItem(K_EX, JSON.stringify(editEx)); renderEx(); }
+function delEx(i) { editEx.splice(i, 1); localStorage.setItem(K_EX, JSON.stringify(editEx)); renderEx(); }
+function saveEx() {
+  localStorage.setItem(K_EX, JSON.stringify(editEx.filter(e => e.name.trim())));
+  const t = getToday();
+  if (t) { localStorage.removeItem(K_TODAY); } // 設定変更を今日のメニューにも反映させる
+  alert("保存しました。次に組むメニューから反映されます。");
+  go(0);
+}
+function resetEx() { localStorage.setItem(K_EX, JSON.stringify(DEFAULT_EX)); renderEx(); }
+
+function init() {
+  const h = today.getHours();
+  document.getElementById("greeting").textContent =
+    h < 10 ? "おはようございます 🌅" : h < 18 ? "こんにちは ☀️" : "こんばんは 🌙";
+  document.getElementById("dateLabel").textContent =
+    `${today.getMonth() + 1}月${today.getDate()}日（${DAYS[dow]}）`;
+  renderHist("histBox0");
+}
+
+migrateDates();
+init();
+const saved = getToday();
+if (saved) showPlan(saved);
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>
