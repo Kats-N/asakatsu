@@ -13,7 +13,7 @@
   :root {
     --green: #2f6f4f; --green-d: #1f4d38; --green-l: #eaf3ee;
     --ink: #22303a; --sub: #64748b; --card: #ffffff;
-    --amber: #b45309; --red: #c0492f; --blue: #1d6fa5;
+    --amber: #b45309; --red: #c0492f; --blue: #1d6fa5; --purple: #6d4aa5;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
@@ -51,6 +51,7 @@
     background: linear-gradient(135deg, var(--green-d), var(--green));
     color: #fff; border-radius: 16px; padding: 18px; margin-bottom: 14px;
   }
+  .hero.gacha { background: linear-gradient(135deg, #4a2f6f, var(--purple)); }
   .hero .place { font-size: 13px; opacity: .85; letter-spacing: .1em; }
   .hero .title { font-size: 21px; font-weight: 800; margin: 2px 0 6px; }
   .hero .lvl { display:inline-block; background:rgba(255,255,255,.2); border-radius:20px; padding:1px 10px; font-size:12px; margin-bottom:6px; }
@@ -71,6 +72,7 @@
   }
   .btn.ghost { background: #fff; color: var(--green); border: 2px solid var(--green); }
   .btn.sub { background: #fff; color: var(--sub); border: 2px solid #d8e3dc; font-size: 15px; padding: 12px; }
+  .btn.gacha { background: linear-gradient(135deg, #4a2f6f, var(--purple)); }
   .btn:active { opacity: .85; }
   .hist { background: #fff; border-radius: 12px; padding: 4px 14px; margin-bottom: 14px; }
   .hist-item { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; font-size: 14px; }
@@ -80,6 +82,12 @@
   .progress { display: flex; gap: 6px; margin-bottom: 6px; }
   .progress span { height: 5px; flex: 1; border-radius: 3px; background: #d8e3dc; }
   .progress span.on { background: var(--green); }
+  .ex-row { display: flex; gap: 6px; align-items: center; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; }
+  .ex-row input[type=text] { flex: 1; min-width: 0; }
+  .ex-row input { border: 1px solid #d8e3dc; border-radius: 8px; padding: 8px; font-size: 14px; font-family: inherit; }
+  .ex-row input[type=number] { width: 58px; text-align: right; }
+  .ex-row .unit { font-size: 13px; color: var(--sub); }
+  .ex-row .del { background: none; border: none; color: var(--red); font-size: 18px; cursor: pointer; padding: 0 4px; }
 </style>
 </head>
 <body>
@@ -95,7 +103,9 @@
       <div style="font-size:14px;color:var(--sub)">3つ答えるだけ。30秒で終わります。</div>
     </div>
     <button class="btn" onclick="go(1)">はじめる</button>
+    <button class="btn gacha" onclick="gacha()">🎲 ランダムガチャで決める</button>
     <button class="btn sub" onclick="go(6)">一覧から自分で選ぶ</button>
+    <button class="btn sub" onclick="go(7)">⚙️ 筋トレの重量・回数を設定</button>
   </div>
 
   <!-- Q1 wake -->
@@ -134,7 +144,7 @@
   <!-- TODAY / RESULT -->
   <div class="screen" id="s4">
     <div id="doneBanner" style="display:none" class="done-banner">✅ 今日のメニューはセット済み</div>
-    <div class="hero">
+    <div class="hero" id="rHero">
       <div class="place" id="rPlace"></div>
       <div class="title" id="rTitle"></div>
       <div><span class="lvl" id="rLvl"></span></div>
@@ -153,6 +163,7 @@
     <div id="histBox4"></div>
     <div id="confirmBtns">
       <button class="btn" onclick="finish()">このメニューでやる 💪</button>
+      <button class="btn gacha" id="rerollBtn" style="display:none" onclick="gacha()">🎲 もう一度引く</button>
       <button class="btn ghost" onclick="go(1)">質問に答え直す</button>
       <button class="btn sub" onclick="go(6)">一覧から選び直す</button>
     </div>
@@ -170,67 +181,102 @@
     <button class="btn sub" onclick="go(0)" style="margin-top:14px">戻る</button>
   </div>
 
+  <!-- SETTINGS -->
+  <div class="screen" id="s7">
+    <div class="q">筋トレの重量・回数</div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:12px">ここを変えると全メニューに反映されます。セット数は強度に応じて自動調整（標準3／軽め2）。</div>
+    <div class="card"><div id="exList"></div></div>
+    <button class="btn sub" onclick="addEx()">＋ 種目を追加</button>
+    <button class="btn" onclick="saveEx()">保存する</button>
+    <button class="btn sub" onclick="resetEx()">初期設定に戻す</button>
+    <button class="btn sub" onclick="go(0)">戻る</button>
+  </div>
+
 </div>
 
 <script>
 "use strict";
-const state = { wake: 2, load: 2, rain: false };
+
+// ---- 日付（ローカル基準。UTCだと早朝が前日になるため）----
+function fmtDate(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
 const today = new Date();
-const todayStr = today.toISOString().slice(0, 10);
+const todayStr = fmtDate(today);
 const dow = today.getDay(); // 0=Sun
 const DAYS = ["日","月","火","水","木","金","土"];
+const LVL_NAME = ["最小", "軽め", "標準", "ハード"];
 const K_TODAY = "asakatsu_today";
 const K_HIST = "asakatsu_history";
-const LVL_NAME = ["最小", "軽め", "標準", "ハード"];
+const K_EX = "asakatsu_exercises";
+const K_FIX = "asakatsu_datefix_v5";
 
-// ---- 週次テンプレ（v4：ジム週4・木/日は回復補正あり）----
-// cat: strength / cardio / light
+const state = { wake: 2, load: 2, rain: false };
+
+// ---- 種目設定 ----
+const DEFAULT_EX = [
+  { name: "チェストプレス", weight: 45, reps: 15 },
+  { name: "スクワットマシン", weight: 60, reps: 15 },
+  { name: "ラットプルダウン", weight: 45, reps: 15 }
+];
+function getEx() {
+  try {
+    const e = JSON.parse(localStorage.getItem(K_EX) || "null");
+    return (Array.isArray(e) && e.length) ? e : DEFAULT_EX.map(x => ({ ...x }));
+  } catch (_) { return DEFAULT_EX.map(x => ({ ...x })); }
+}
+function exLines(sets) {
+  return getEx().map(e => `${e.name} ${e.weight}kg ${e.reps}×${sets}`);
+}
+
+// ---- 週次テンプレ（v5：ジム=月・水・木・日）----
 const TEMPLATE = {
-  1: { cat:"strength", place:"ジム", title:"筋力デー" },
-  2: { cat:"cardio",   place:"外",   title:"イージーデー" },
-  3: { cat:"light",    place:"家周辺", title:"最軽量デー" },
-  4: { cat:"strength", place:"ジム", title:"筋力デー（断食明け）", fasting:true },
-  5: { cat:"strength", place:"ジム", title:"筋力デー" },
-  6: { cat:"cardio",   place:"外",   title:"持久ランデー", endurance:true },
-  0: { cat:"strength", place:"ジム", title:"筋力デー（週末）" }
+  1: { cat:"gym_strength", place:"ジム", title:"筋力デー" },
+  2: { cat:"cardio",       place:"外",   title:"イージーランデー" },
+  3: { cat:"gym_run",      place:"ジム", title:"トレッドミルデー" },
+  4: { cat:"gym_strength", place:"ジム", title:"筋力デー（断食明け）", fasting:true },
+  5: { cat:"cardio",       place:"外",   title:"イージーランデー" },
+  6: { cat:"cardio",       place:"外",   title:"持久ランデー", endurance:true },
+  0: { cat:"gym_strength", place:"ジム", title:"筋力デー（週末）" }
 };
 
 const HOME_A = ["プッシュアップ 15×3","自重スクワット 20×3","グッドモーニング 15×3","※3秒かけて下ろすテンポで負荷を出す"];
 const HOME_B = ["自重タバタ 4分","スクワット 3分","プッシュアップ 3分"];
 
 // ---- レベル→メニュー ----
-function strengthMenu(level, fasting) {
+function gymStrengthMenu(level, fasting) {
   const warm = fasting ? "トレッドミル歩き 12〜15分（血圧を立ち上げる）" : "トレッドミル歩き 10分";
-  if (level <= 0) return ["ジムは軽く or 自宅タバタ 4分","無理なら休養＋モビリティ", fasting ? "電解質と水を先に" : ""].filter(Boolean);
-  const sets = level >= 2 ? "15×3" : "15×2";
-  const m = [warm, `チェストプレス 45kg ${sets}`, `スクワットマシン 60kg ${sets}`, `ラットプルダウン 45kg ${sets}`];
+  if (level <= 0) return ["ジムは軽く or 自宅タバタ 4分", "無理なら休養＋モビリティ", fasting ? "電解質と水を先に" : ""].filter(Boolean);
+  const sets = level >= 2 ? 3 : 2;
+  const m = [warm, ...exLines(sets)];
   if (level >= 3) m.push("最終セットは丁寧に追い込み");
   if (fasting) m.push("断食明け：しんどければ即中断。無理は禁物");
   return m;
 }
+function gymRunMenu(level) {
+  if (level <= 0) return ["傾斜ウォーク 15〜20分", "無理はしない"];
+  if (level === 1) return ["トレッドミル 3km（ゆっくり）", "余裕があれば傾斜ウォーク追加"];
+  if (level === 2) return ["トレッドミル 5km", "終わりに軽くストレッチ"];
+  return ["トレッドミル 5〜6km（ペース速め）", "怪我予防だけは優先。違和感が出たら即ペースダウン"];
+}
 function cardioMenu(level, endurance) {
   if (level <= 0) return ["早歩き 15〜20分 or 休養"];
-  if (level === 1) return ["早歩き or 会話ペースの軽ジョグ 20〜25分"];
-  if (level === 2) return endurance ? ["イージーラン（ゆっくり長め可）","今週の持久ベース"] : ["イージーラン（ゆっくり長め可）"];
-  return ["ラン（少し長め or 速め、+1kmまで）","怪我予防優先。脚に違和感があれば即歩きに"];
-}
-function lightMenu(level) {
-  if (level <= 0) return ["室内モビリティ＋瞑想のみ"];
-  return ["早歩き 15分","瞑想を長めに（15分〜）"];
+  if (level === 1) return ["早歩き〜会話ペースの軽ジョグ 20〜25分"];
+  if (level === 2) return endurance ? ["イージーラン（ゆっくり長め可）", "今週の持久ベース"] : ["イージーラン 5km前後（ゆっくり）"];
+  return ["ラン（少し長め or 速め、+1kmまで）", "怪我予防優先。脚に違和感があれば即歩きに"];
 }
 
-// ---- レベル計算（v4ロジック）----
+// ---- レベル計算（v5）----
 function calcLevel() {
-  let level = 2; // 基準＝テンプレ標準
+  let level = 2;
   // 1. 安全弁（睡眠・エネルギー）
   if (state.wake === 1) level -= 1;
   if (state.wake === 3 && state.load <= 2) level += 1;
   // 2. アクセル（稼働）— 寝不足なら効かない
   if (state.load === 3 && state.wake >= 2) level += 1;
   // 3. 曜日の生理補正
-  if (dow === 4) level -= 1;               // 断食明け木曜
-  if (dow === 0) level -= 1;               // 週末日曜（回復・飲酒明け配慮）
-  if (dow === 3) level = Math.min(level, 1); // 水曜断食＋会議
+  if (dow === 4) level -= 1; // 断食明け木曜
+  if (dow === 0) level -= 1; // 週末日曜（回復・飲酒明け配慮）
   return Math.max(0, Math.min(3, level));
 }
 
@@ -242,16 +288,22 @@ function buildPlan() {
 
   if (state.rain) {
     place = "家";
-    if (base.cat === "strength") menu = level <= 0 ? [...HOME_B] : HOME_A.map(m => level === 1 ? m.replace("×3","×2") : m);
-    else if (base.cat === "cardio") menu = [...HOME_B];
-    else menu = ["室内モビリティ 10分","瞑想を長めに"];
+    if (base.cat === "gym_strength") menu = level <= 0 ? [...HOME_B] : HOME_A.map(m => level === 1 ? m.replace("×3", "×2") : m);
+    else menu = [...HOME_B];
     title += "（雨・自宅）";
+  } else if (base.cat === "gym_strength") {
+    menu = gymStrengthMenu(level, base.fasting);
+  } else if (base.cat === "gym_run") {
+    menu = gymRunMenu(level);
   } else {
-    if (base.cat === "strength") menu = strengthMenu(level, base.fasting);
-    else if (base.cat === "cardio") menu = cardioMenu(level, base.endurance);
-    else menu = lightMenu(level);
+    menu = cardioMenu(level, base.endurance);
   }
 
+  // 連続ラン検知
+  if (!state.rain && level >= 2 && ["cardio","gym_run"].includes(base.cat)) {
+    const last = getHist().filter(h => h.date !== todayStr).slice(-1)[0];
+    if (last && last.ran) menu = menu.concat(["※前回も走っています。脚に違和感があれば歩きに置き換え"]);
+  }
   return { date: todayStr, place, title, menu, level, msg: pickMsg(level, base), done: false };
 }
 
@@ -271,43 +323,64 @@ const CHEERS = [
   "昨日の自分より1mm前へ。それで十分。",
   "この積み重ねが、仕事の集中力を作っています。"
 ];
+const GACHA_MSG = [
+  "引いたからにはやるだけ。迷いはここで終わり。🎲",
+  "運命が決めました。あとは体を動かすのみ。",
+  "自分で選ぶと甘くなる。だから今日は運任せ。",
+  "出た目がその日の正解。淡々といきましょう。"
+];
 
 // ---- 曜日イベントの注意書き ----
 function specialNotes() {
   const notes = [];
-  if (dow === 3) notes.push({cls:"", text:"🍵 <b>今日はファスティングデー。</b>空腹は「効いてる」サイン。コーヒーとサプリで整えつつ、会議も乗り切りましょう。"});
-  if (dow === 4) notes.push({cls:"", text:"🍽 <b>断食明けの朝。</b>糖質が枯れています。運動前に少し水分・電解質を。物足りなくても今日はこれで十分。"});
+  if (dow === 3) notes.push({cls:"", text:"🍵 <b>今日はファスティングデー。</b>朝は昨夜の食事が残っているので動けます。ただし次の食事は明日の夕方。今日は筋トレより有酸素向きです。"});
+  if (dow === 4) notes.push({cls:"", text:"🍽 <b>断食明けの朝。</b>糖質が枯れています。運動前に水分・電解質を。物足りなくても今日はこれで十分。"});
   if ([2,6,0].includes(dow)) notes.push({cls:"red", text:"🍺 <b>飲酒明けの可能性がある朝。</b>飲んだ翌朝なら「目覚めイマイチ」を選べば自動で軽くなります。まず水をコップ1杯。"});
   if ([1,5,6].includes(dow)) notes.push({cls:"blue", text:"🌙 <b>今夜は晩酌OKの日。</b>飲む前に水500ml／就寝3時間前までに切り上げ／量は気持ちよく話せる範囲まで。"});
   return notes;
 }
 
 // ---- 保存・履歴 ----
-function getHist() { return JSON.parse(localStorage.getItem(K_HIST) || "[]"); }
+function getHist() { try { return JSON.parse(localStorage.getItem(K_HIST) || "[]"); } catch (_) { return []; } }
 function getToday() {
-  const t = JSON.parse(localStorage.getItem(K_TODAY) || "null");
-  return (t && t.date === todayStr) ? t : null;
+  try {
+    const t = JSON.parse(localStorage.getItem(K_TODAY) || "null");
+    return (t && t.date === todayStr) ? t : null;
+  } catch (_) { return null; }
 }
 function saveToday(plan) { localStorage.setItem(K_TODAY, JSON.stringify(plan)); }
 function saveHist(plan) {
-  let hist = getHist().filter(h => h.date !== todayStr);
-  const ran = /ラン|ジョグ/.test(plan.menu.join()) && !/走らなくてOK|歩き/.test(plan.menu.join());
+  const hist = getHist().filter(h => h.date !== todayStr);
+  const j = plan.menu.join();
+  const ran = /ラン|ジョグ|トレッドミル \d/.test(j) && !/歩き 1|歩き〜/.test(j);
   hist.push({ date: todayStr, day: DAYS[dow], title: plan.title, ran });
   localStorage.setItem(K_HIST, JSON.stringify(hist.slice(-60)));
 }
+// 旧版（UTC基準）で保存された日付を1日補正する一度きりの移行
+function migrateDates() {
+  if (localStorage.getItem(K_FIX)) return;
+  const hist = getHist().map(h => {
+    const d = new Date(h.date + "T12:00:00");
+    d.setDate(d.getDate() + 1);
+    return { ...h, date: fmtDate(d) };
+  });
+  localStorage.setItem(K_HIST, JSON.stringify(hist));
+  localStorage.setItem(K_FIX, "1");
+}
 
-// ---- 手動選択レパートリー ----
+// ---- レパートリー（手動選択・ガチャ共通）----
 const REPERTOIRE = [
-  { emoji:"🏋️", place:"ジム", title:"筋力フル", menu:["トレッドミル歩き 10分","チェストプレス 45kg 15×3","スクワットマシン 60kg 15×3","ラットプルダウン 45kg 15×3"] },
-  { emoji:"🏋️", place:"ジム", title:"筋力（軽め・断食明け向き）", menu:["トレッドミル歩き 12〜15分","筋トレ3種 各15×2","無理なら中断・電解質"] },
-  { emoji:"🏃", place:"外", title:"イージーラン", menu:["イージーラン（ゆっくり長め可）"] },
-  { emoji:"🏃", place:"外", title:"ラン（攻め）", menu:["ラン（少し長め or 速め、+1kmまで）","怪我予防だけは優先"] },
-  { emoji:"🚶", place:"外", title:"早歩き・軽ジョグ", menu:["早歩き or 会話ペースの軽ジョグ 20〜25分"] },
-  { emoji:"🧘", place:"家周辺", title:"最軽量（歩き＋瞑想）", menu:["早歩き 15分","瞑想を長めに（15分〜）"] },
-  { emoji:"💪", place:"家", title:"自宅A（筋力サーキット）", menu: HOME_A },
-  { emoji:"🔥", place:"家", title:"自宅B（有酸素サーキット）", menu: HOME_B },
-  { emoji:"⏱", place:"家", title:"最小（タバタのみ）", menu:["自宅タバタ 4分だけでOK","＋プレハブは必ず"] },
-  { emoji:"🛌", place:"家", title:"完全休養", menu:["今日は休む。それも計画のうち","やるなら軽いモビリティ・ストレッチだけ","水分補給をしっかり"] }
+  { emoji:"🏋️", place:"ジム", title:"ジム・筋力メイン", gacha:true, menu:() => ["トレッドミル歩き 10分", ...exLines(3)] },
+  { emoji:"🏃", place:"ジム", title:"ジム・トレッドミルメイン", gacha:true, menu:() => ["トレッドミル 5km", "終わりに軽くストレッチ"] },
+  { emoji:"⚡", place:"ジム", title:"ジム・ミックス（有酸素＋筋力）", gacha:true, menu:() => ["トレッドミル 3km", ...exLines(2)] },
+  { emoji:"🪶", place:"ジム", title:"ジム・筋力（軽め／断食明け向き）", gacha:true, menu:() => ["トレッドミル歩き 12〜15分", ...exLines(2), "無理なら中断・電解質"] },
+  { emoji:"🏃", place:"外", title:"イージーラン", gacha:true, menu:() => ["イージーラン 5km前後（ゆっくり）"] },
+  { emoji:"🔥", place:"外", title:"ラン（攻め）", gacha:true, menu:() => ["ラン（少し長め or 速め、+1kmまで）", "怪我予防だけは優先"] },
+  { emoji:"💪", place:"家", title:"自宅A（筋力サーキット）", gacha:true, menu:() => [...HOME_A] },
+  { emoji:"🔥", place:"家", title:"自宅B（有酸素サーキット）", gacha:true, menu:() => [...HOME_B] },
+  { emoji:"🧘", place:"家周辺", title:"最軽量（歩き＋瞑想）", gacha:false, menu:() => ["早歩き 15分", "瞑想を長めに（15分〜）"] },
+  { emoji:"⏱", place:"家", title:"最小（タバタのみ）", gacha:false, menu:() => ["自宅タバタ 4分だけでOK", "＋プレハブは必ず"] },
+  { emoji:"🛌", place:"家", title:"完全休養", gacha:false, menu:() => ["今日は休む。それも計画のうち", "やるなら軽いモビリティ・ストレッチだけ", "水分補給をしっかり"] }
 ];
 
 // ---- UI ----
@@ -319,6 +392,7 @@ function go(n) {
   window.scrollTo(0, 0);
   if (n === 0) init();
   if (n === 6) renderRepertoire();
+  if (n === 7) renderEx();
 }
 function ans(key, val) {
   state[key] = val;
@@ -329,7 +403,8 @@ function ans(key, val) {
 function showPlan(plan) {
   currentPlan = plan;
   saveToday(plan);
-  document.getElementById("rPlace").textContent = "📍 " + plan.place;
+  document.getElementById("rHero").className = "hero" + (plan.isGacha ? " gacha" : "");
+  document.getElementById("rPlace").textContent = (plan.isGacha ? "🎲 ガチャの結果｜📍 " : "📍 ") + plan.place;
   document.getElementById("rTitle").textContent = DAYS[dow] + "曜｜" + plan.title;
   document.getElementById("rLvl").textContent = "強度：" + (LVL_NAME[plan.level] || "標準");
   document.getElementById("rMsg").textContent = plan.msg;
@@ -340,6 +415,7 @@ function showPlan(plan) {
   document.getElementById("doneBanner").style.display = plan.done ? "block" : "none";
   document.getElementById("confirmBtns").style.display = plan.done ? "none" : "block";
   document.getElementById("doneBtns").style.display = plan.done ? "block" : "none";
+  document.getElementById("rerollBtn").style.display = (plan.isGacha && !plan.done) ? "block" : "none";
   renderHist("histBox4");
   go(4);
 }
@@ -350,10 +426,22 @@ function finish() {
   saveHist(currentPlan);
   showPlan(currentPlan);
 }
-function pickManual(i) {
-  const r = REPERTOIRE[i];
-  showPlan({ date: todayStr, place: r.place, title: r.title, menu: [...r.menu],
-    level: 2, msg: CHEERS[Math.floor(Math.random() * CHEERS.length)], done: false });
+function planFromRep(r, extra) {
+  return Object.assign({
+    date: todayStr, place: r.place, title: r.title, menu: r.menu(),
+    level: 2, msg: CHEERS[Math.floor(Math.random() * CHEERS.length)], done: false
+  }, extra || {});
+}
+function pickManual(i) { showPlan(planFromRep(REPERTOIRE[i])); }
+function gacha() {
+  const pool = REPERTOIRE.filter(r => r.gacha);
+  let r = pool[Math.floor(Math.random() * pool.length)];
+  // 同じ結果の連続を避ける
+  if (currentPlan && currentPlan.isGacha && pool.length > 1) {
+    let guard = 0;
+    while (r.title === currentPlan.title && guard++ < 10) r = pool[Math.floor(Math.random() * pool.length)];
+  }
+  showPlan(planFromRep(r, { isGacha: true, msg: GACHA_MSG[Math.floor(Math.random() * GACHA_MSG.length)] }));
 }
 function renderRepertoire() {
   document.getElementById("repList").innerHTML = REPERTOIRE
@@ -367,6 +455,31 @@ function renderHist(boxId) {
     items.map(h => `<div class="hist-item"><span class="d">${h.date.slice(5).replace("-","/")} ${h.day}</span><span>${h.title}</span></div>`).join("") + `</div>`;
 }
 
+// ---- 設定画面 ----
+let editEx = [];
+function renderEx() {
+  editEx = getEx();
+  document.getElementById("exList").innerHTML = editEx.map((e, i) => `
+    <div class="ex-row">
+      <input type="text" value="${e.name.replace(/"/g,'&quot;')}" oninput="editEx[${i}].name=this.value">
+      <input type="number" value="${e.weight}" min="0" step="2.5" oninput="editEx[${i}].weight=parseFloat(this.value)||0">
+      <span class="unit">kg</span>
+      <input type="number" value="${e.reps}" min="1" step="1" oninput="editEx[${i}].reps=parseInt(this.value)||1">
+      <span class="unit">回</span>
+      <button class="del" onclick="delEx(${i})">×</button>
+    </div>`).join("");
+}
+function addEx() { editEx.push({ name: "新しい種目", weight: 20, reps: 15 }); localStorage.setItem(K_EX, JSON.stringify(editEx)); renderEx(); }
+function delEx(i) { editEx.splice(i, 1); localStorage.setItem(K_EX, JSON.stringify(editEx)); renderEx(); }
+function saveEx() {
+  localStorage.setItem(K_EX, JSON.stringify(editEx.filter(e => e.name.trim())));
+  const t = getToday();
+  if (t) { localStorage.removeItem(K_TODAY); } // 設定変更を今日のメニューにも反映させる
+  alert("保存しました。次に組むメニューから反映されます。");
+  go(0);
+}
+function resetEx() { localStorage.setItem(K_EX, JSON.stringify(DEFAULT_EX)); renderEx(); }
+
 function init() {
   const h = today.getHours();
   document.getElementById("greeting").textContent =
@@ -376,6 +489,7 @@ function init() {
   renderHist("histBox0");
 }
 
+migrateDates();
 init();
 const saved = getToday();
 if (saved) showPlan(saved);
